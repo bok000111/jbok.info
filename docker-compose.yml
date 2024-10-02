@@ -1,0 +1,86 @@
+name: jbok_info
+
+services:
+  nginx:
+    image: jbok_info-nginx:latest
+    build:
+      context: ./nginx
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - static_data:${NGINX_STATIC_PATH}:ro
+      - cert_data:${NGINX_CERT_PATH}:ro
+      - ${HOST_CHALLENGE_PATH}:${NGINX_CHALLENGE_PATH}:ro
+    env_file:
+      - .env
+    networks:
+      - intra
+    depends_on:
+      - react_build
+
+  # axum:
+  #   image: jbok_info-axum:latest
+  #   build:
+  #     context: ./axum
+  #   container_name: axum
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env
+  #   networks:
+  #     - intra
+
+  react_build:
+    image: jbok_info-react_build:latest
+    build:
+      context: ./react
+    container_name: react_build
+    volumes:
+      - static_data:${NGINX_STATIC_PATH}:rw
+    env_file:
+      - .env
+
+  # wasm_compile:
+  #   build:
+  #     context: ./wasm
+  #   container_name: wasm_compile
+  #   volumes:
+  #     - static_data:${WASM_DIST}
+  #   env_file:
+  #     - .env
+
+  # sqlite:
+  #   image: jbok_info-sqlite:latest
+  #   build:
+  #     context: ./sqlite
+  #   container_name: sqlite
+  #   volumes:
+  #     - static_data:/var/lib/sqlite
+  #   env_file:
+  #     - .env
+  #   networks:
+  #     - intra
+
+
+volumes:
+  static_data:
+    name: jbokinfo_static_data
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=100m"
+
+  cert_data:
+    name: jbokinfo_cert_data
+    external: true
+
+  # db_data:
+    # name: jbokinfo_db_data
+    # external: true
+
+networks:
+  intra:
+    driver: bridge
