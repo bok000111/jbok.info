@@ -5,7 +5,7 @@ WORKDIR /wasm
 RUN apk add --no-cache wasm-pack binaryen
 
 COPY wasm/src ./src
-COPY wasm/Cargo.toml wasm/Cargo.lock ./
+COPY wasm/Cargo.toml ./
 
 RUN wasm-pack build --no-pack
 
