@@ -6,15 +6,15 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment: jbok.info
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+    # - name: Set up QEMU
+      # uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -90,7 +90,7 @@ jobs:
         host: ${{ secrets.AWS_EC2_HOSTNAME }}
         username: alpine
         key: ${{ secrets.AWS_EC2_SSH_SECRET_KEY }}
-        script: cd jbok.info && ./deploy.sh && rm -rf images.decrypted.tar images
+        script: cd jbok.info && ./deploy.sh
 
     - name: Remove Github Actions IP from Security group
       run: |

@@ -2,7 +2,7 @@ FROM rust:alpine3.20 AS wasm_builder
 
 WORKDIR /wasm
 
-RUN apk add --no-cache wasm-bindgen wasm-pack binaryen
+RUN apk add --no-cache wasm-pack binaryen
 
 COPY wasm/src ./src
 COPY wasm/Cargo.toml ./
@@ -34,7 +34,5 @@ RUN yarn build
 FROM alpine:3.20 AS deploy
 
 COPY --from=react_builder /react/dist/ /react/dist/
-
-RUN du -sh /react/dist
 
 CMD ["/bin/sh", "-c", "/bin/cp -r /react/dist/* /var/www/jbok.info/"]

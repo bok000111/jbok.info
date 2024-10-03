@@ -56,15 +56,9 @@ services:
   #   networks:
   #     - intra
 
-
 volumes:
   static_data:
     name: jbokinfo_static_data
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-      o: "size=100m"
   cert_data:
     name: jbokinfo_cert_data
     external: true
