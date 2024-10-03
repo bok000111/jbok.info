@@ -2,7 +2,7 @@ FROM rust:alpine3.20 AS wasm_builder
 
 WORKDIR /wasm
 
-RUN apk add --no-cache wasm-pack binaryen
+RUN apk add --no-cache wasm-bindgen wasm-pack binaryen
 
 COPY wasm/src ./src
 COPY wasm/Cargo.toml ./
