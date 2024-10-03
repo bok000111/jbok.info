@@ -18,7 +18,8 @@ services:
     networks:
       - intra
     depends_on:
-      - react_build
+      frontend:
+        condition: service_completed_successfully
     secrets:
       - nginx_default
       - nginx_renew
@@ -35,22 +36,13 @@ services:
   #   networks:
   #     - intra
 
-  react_build:
-    image: jbok_info-react_build:latest
+  frontend:
+    image: jbok_info-frontend:latest
     build:
-      context: ./react
-    container_name: react_build
+      context: ./frontend
+    container_name: frontend
     volumes:
       - static_data:/var/www/jbok.info:rw
-
-  # wasm_compile:
-  #   build:
-  #     context: ./wasm
-  #   container_name: wasm_compile
-  #   volumes:
-  #     - static_data:${WASM_DIST}
-  #   env_file:
-  #     - .env
 
   # sqlite:
   #   image: jbok_info-sqlite:latest

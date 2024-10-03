@@ -1,0 +1,7 @@
+{
+	"name": "jbok.info",
+	"private": true,
+	"scripts": {
+		"dev": "concurrently 'cd ./frontend/wasm && cargo watch -s \"wasm-pack build --dev\"' 'yarn --cwd frontend/react dev'"
+	}
+}
