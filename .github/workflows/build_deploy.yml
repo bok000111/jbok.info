@@ -1,0 +1,99 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: jbok.info
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker images for ARM64
+      run: |
+        mkdir -p .secrets images
+        echo "${{ secrets.NGINX_CONF }}" > .secrets/nginx.conf
+        echo "${{ secrets.DEFAULT_CONF }}" > .secrets/default.conf
+        echo "${{ secrets.RENEW_CONF }}" > .secrets/renew.conf
+        docker buildx bake --set *.platform=linux/arm64 --load
+        docker compose -f docker-compose.yml config --services | while read service; do
+          image_name=$(docker compose -f docker-compose.yml config | grep "image:" | grep "${service}" | awk '{print $2}')
+          docker save -o images/${service}.tar ${image_name}
+        done
+        tar -cf - images | gpg --symmetric --cipher-algo AES256 --batch --passphrase ${{ secrets.GPG_PASS }} > images.tar
+    
+    - name: upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        path: images.tar
+        name: images.tar
+        retention-days: 1
+        overwrite: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: jbok.info
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Public IP
+      id: ip
+      uses: haythem/public-ip@v1.3
+    
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: images.tar
+    
+    - name: Decrypt images
+      run: |
+        gpg --decrypt --batch --passphrase ${{ secrets.GPG_PASS }} images.tar > images.decrypted.tar
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.GH_ACTION_RUNNER_AWS_ROLE_ARN }}
+        aws-region: ${{ secrets.GH_ACTION_RUNNER_AWS_REGION }}
+
+    - name: Add Github Actions IP to Security group
+      run: |
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.GH_ACTION_RUNNER_AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
+
+    - name: SCP images to EC2
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.AWS_EC2_HOSTNAME }}
+        username: alpine
+        key: ${{ secrets.AWS_EC2_SSH_SECRET_KEY }}
+        source: "images.decrypted.tar,docker-compose.yml,deploy.sh"
+        target: ~/jbok.info/
+
+    - name: Run docker compose via ssh
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.AWS_EC2_HOSTNAME }}
+        username: alpine
+        key: ${{ secrets.AWS_EC2_SSH_SECRET_KEY }}
+        script: cd jbok.info && ./deploy.sh && rm -rf images.decrypted.tar images
+
+    - name: Remove Github Actions IP from Security group
+      run: |
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.GH_ACTION_RUNNER_AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32

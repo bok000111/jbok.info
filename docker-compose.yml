@@ -4,21 +4,24 @@ services:
   nginx:
     image: jbok_info-nginx:latest
     build:
+      secrets:
+        - nginx_conf
       context: ./nginx
     container_name: nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - static_data:${NGINX_STATIC_PATH}:ro
-      - cert_data:${NGINX_CERT_PATH}:ro
-      - ${HOST_CHALLENGE_PATH}:${NGINX_CHALLENGE_PATH}:ro
-    env_file:
-      - .env
+      - static_data:/var/www/jbok.info:ro
+      - cert_data:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot
     networks:
       - intra
     depends_on:
       - react_build
+    secrets:
+      - nginx_default
+      - nginx_renew
 
   # axum:
   #   image: jbok_info-axum:latest
@@ -38,9 +41,7 @@ services:
       context: ./react
     container_name: react_build
     volumes:
-      - static_data:${NGINX_STATIC_PATH}:rw
-    env_file:
-      - .env
+      - static_data:/var/www/jbok.info:rw
 
   # wasm_compile:
   #   build:
@@ -72,14 +73,20 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: "size=100m"
-
   cert_data:
     name: jbokinfo_cert_data
     external: true
-
   # db_data:
     # name: jbokinfo_db_data
     # external: true
+
+secrets:
+  nginx_conf:
+    file: .secrets/nginx.conf
+  nginx_default:
+    file: .secrets/default.conf
+  nginx_renew:
+    file: .secrets/renew.conf
 
 networks:
   intra:

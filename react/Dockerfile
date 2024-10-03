@@ -2,26 +2,16 @@ FROM node:alpine3.20 AS react_builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json yarn.lock ./
 
-RUN npm ci
+RUN yarn install --frozen-lockfile
 
-COPY src/ src/
-COPY public/ public/
-COPY index.html \
-	vite.config.ts \
-	tsconfig.json \
-	tsconfig.app.json \
-	tsconfig.node.json \
-	postcss.config.js \
-	tailwind.config.js \
-	./
+COPY . .
 
-RUN npm run build
+RUN yarn build
 
 FROM alpine:3.20 AS deploy
 
 COPY --from=react_builder /app/dist/ /app/dist/
 
-ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["/bin/mv /app/dist/* /var/www/jbok.info/"]
+CMD ["/bin/sh", "-c", "/bin/cp -r /app/dist/* /var/www/jbok.info/"]
