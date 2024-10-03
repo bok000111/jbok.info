@@ -13,7 +13,10 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ]
+      ],
+      "&/*": [
+        "../wasm/pkg/*"
+      ],
     },
     /* Bundler mode */
     "moduleResolution": "bundler",
