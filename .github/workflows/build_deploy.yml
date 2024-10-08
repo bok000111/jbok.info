@@ -25,7 +25,7 @@ jobs:
         echo "${{ secrets.NGINX_CONF }}" > .secrets/nginx.conf
         echo "${{ secrets.DEFAULT_CONF }}" > .secrets/default.conf
         echo "${{ secrets.RENEW_CONF }}" > .secrets/renew.conf
-        docker buildx bake --set *.platform=linux/arm64 --load
+        docker buildx bake --set nginx.platform=linux/arm64 --load
         docker compose -f docker-compose.yml config --services | while read service; do
           image_name=$(docker compose -f docker-compose.yml config | grep "image:" | grep "${service}" | awk '{print $2}')
           docker save -o images/${service}.tar ${image_name}
