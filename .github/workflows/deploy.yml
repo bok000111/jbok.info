@@ -6,8 +6,8 @@ on:
 
 jobs:
   build:
-    # runs-on: macos-latest // Use macos-latest for native arm64 build
-    runs-on: self-hosted // Use self-hosted runner for arm64 build - M1 Mac
+    # runs-on: macos-latest # Use macos-latest for native arm64 build
+    runs-on: self-hosted # Use self-hosted runner for arm64 build - M1 Mac
     environment: jbok.info
 
     strategy:
