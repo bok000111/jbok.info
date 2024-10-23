@@ -1,0 +1,126 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    # runs-on: macos-latest // Use macos-latest for native arm64 build
+    runs-on: self-hosted // Use self-hosted runner for arm64 build - M1 Mac
+    environment: jbok.info
+
+    strategy:
+      matrix:
+        service: [axum, frontend, nginx]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4.2.1
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3.2.0
+      if: runner.arch != 'arm64'
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3.7.1
+
+    # TODO: Compile rust binary and frontend outside of docker for faster build time
+    # - name: Set up rust toolchain
+    #   uses: actions-rs/toolchain@v1
+    #   if: matrix.service == 'axum' || matrix.service == 'frontend'
+    # - name: Compile axum binary
+    #   run: |
+    #     cd backend && \
+    #     cargo build --release --target aarch64-unknown-linux-musl
+    #   if: matrix.service == 'axum'
+    # - name: Compile frontend
+    #   run: |
+    #     cd frontend && \
+    #     yarn install && \
+    #     yarn build
+    #   if: matrix.service == 'frontend'
+
+    - name: Build Docker images
+      run: |
+        set -o pipefail  # 파이프라인에서 실패를 감지
+        docker buildx bake "${{matrix.service}}" \
+          --set "${{matrix.service}}.platform=linux/arm64" \
+          --set "${{matrix.service}}.output=type=docker,dest=-" \
+          --no-cache | \
+          gpg --symmetric --cipher-algo AES256 --batch --passphrase "${{secrets.GPG_PASS}}" \
+          -o "${{matrix.service}}.tar.gpg"
+
+    - name: upload artifacts
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: ${{matrix.service}}.tar.gpg
+        path: ${{matrix.service}}.tar.gpg
+        retention-days: 1
+        overwrite: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: jbok.info
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4.2.1
+
+    - name: Public IP
+      id: ip
+      uses: haythem/public-ip@v1.3
+    
+    - name: download artifacts
+      uses: actions/download-artifact@v4.1.8
+      with:
+        pattern: '*.tar.gpg'
+        merge-multiple: true
+    
+    - name: Decrypt images
+      run: |
+        for file in *.tar.gpg; do
+          output_file="${file/.tar.gpg/.tar}"
+          gpg --decrypt --batch --passphrase ${{secrets.GPG_PASS}} -o "$output_file" "$file"
+        done
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4.0.2
+      with:
+        role-to-assume: ${{secrets.GH_ACTION_RUNNER_AWS_ROLE_ARN}}
+        aws-region: ${{secrets.GH_ACTION_RUNNER_AWS_REGION}}
+
+    - name: Add Github Actions IP to Security group
+      run: |
+        aws ec2 authorize-security-group-ingress --group-id ${{secrets.GH_ACTION_RUNNER_AWS_SG_ID}} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
+
+    - name: SCP images to EC2
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{secrets.AWS_EC2_HOSTNAME}}
+        username: alpine
+        key: ${{secrets.AWS_EC2_SSH_SECRET_KEY}}
+        source: "docker-compose.yml,*.tar"
+        target: ~/jbok.info/
+
+    - name: Run docker compose via ssh
+      uses: appleboy/ssh-action@v1.1.0
+      with:
+        host: ${{secrets.AWS_EC2_HOSTNAME}}
+        username: alpine
+        key: ${{secrets.AWS_EC2_SSH_SECRET_KEY}}
+        script: |
+          cd ~/jbok.info && \
+          docker compose down --remove-orphans --rmi all --volumes && \
+          docker image prune -f && \
+          docker container prune -f && \
+          for i in *.tar; do docker load -i $i; done && \
+          docker compose up --detach --remove-orphans
+
+    - name: Remove Github Actions IP from Security group
+      run: |
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.GH_ACTION_RUNNER_AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32

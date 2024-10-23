@@ -4,37 +4,37 @@ services:
   nginx:
     image: jbok_info-nginx:latest
     build:
-      secrets:
-        - nginx_conf
       context: ./nginx
     container_name: nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - static_data:/var/www/jbok.info:ro
+      - static_data:/var/www/jbok.info
       - cert_data:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
+    secrets:
+      - nginx_conf
+      - nginx_default
+      - nginx_renew
     networks:
       - intra
     depends_on:
       frontend:
         condition: service_completed_successfully
-    secrets:
-      - nginx_default
-      - nginx_renew
+    restart: unless-stopped
 
-  # axum:
-  #   image: jbok_info-axum:latest
-  #   build:
-  #     context: ./axum
-  #   container_name: axum
-  #   ports:
-  #     - "3000:3000"
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - intra
+  axum:
+    image: jbok_info-axum:latest
+    build:
+      context: ./backend
+    container_name: axum
+    networks:
+      - intra
+    # depends_on:
+      # sqlite:
+        # condition: healthy
+    restart: unless-stopped
 
   frontend:
     image: jbok_info-frontend:latest
@@ -43,27 +43,25 @@ services:
     container_name: frontend
     volumes:
       - static_data:/var/www/jbok.info:rw
+    restart: on-failure
 
   # sqlite:
   #   image: jbok_info-sqlite:latest
   #   build:
   #     context: ./sqlite
   #   container_name: sqlite
-  #   volumes:
-  #     - static_data:/var/lib/sqlite
-  #   env_file:
-  #     - .env
   #   networks:
   #     - intra
+  #   restart: unless-stopped
 
 volumes:
   static_data:
-    name: jbokinfo_static_data
+    name: jbok_info-static_data
   cert_data:
-    name: jbokinfo_cert_data
+    name: jbok_info-cert_data
     external: true
   # db_data:
-    # name: jbokinfo_db_data
+    # name: jbok_info_db_data
     # external: true
 
 secrets:
