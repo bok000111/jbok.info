@@ -1,2 +1,8 @@
-.DS_Store
-.secrets/
+**/.DS_Store
+**/.secrets/
+**/node_modules/
+**/dist/
+**/target/
+**/Cargo.lock
+**/.env*
+**.tar
