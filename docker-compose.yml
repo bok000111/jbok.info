@@ -14,9 +14,9 @@ services:
       - cert_data:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
     secrets:
-      - nginx_conf
-      - nginx_default
-      - nginx_renew
+      - nginx.conf
+      - default.conf
+      - renew.conf
     networks:
       - intra
     depends_on:
@@ -65,11 +65,11 @@ volumes:
     # external: true
 
 secrets:
-  nginx_conf:
+  nginx.conf:
     file: .secrets/nginx.conf
-  nginx_default:
+  default.conf:
     file: .secrets/default.conf
-  nginx_renew:
+  renew.conf:
     file: .secrets/renew.conf
 
 networks:
