@@ -2,6 +2,6 @@
 	"name": "jbok.info",
 	"private": true,
 	"scripts": {
-		"dev": "concurrently 'cd ./frontend/wasm && cargo watch -s \"wasm-pack build --dev\"' 'yarn --cwd frontend/react dev'"
+		"dev": "concurrently 'yarn --cwd frontend/react dev' 'cd ./frontend/wasm && cargo watch -s \"wasm-pack build --dev\"' 'cd ./backend && RUST_BACKTRACE=1 AXUM_PROFILE=dev cargo watch -x run'"
 	}
 }
