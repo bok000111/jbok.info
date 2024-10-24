@@ -118,7 +118,6 @@ jobs:
           echo "${{secrets.NGINX_CONF}}" > ~/jbok.info/.secrets/nginx.conf
           echo "${{secrets.RENEW_CONF}}" > ~/jbok.info/.secrets/renew.conf
           echo "${{secrets.DEFAULT_CONF}}" > ~/jbok.info/.secrets/default.conf
-
     - name: Run docker compose via ssh
       uses: appleboy/ssh-action@v1.1.0
       with:
