@@ -43,7 +43,7 @@ jobs:
 
     - name: Build Docker images
       run: |
-        set -o pipefail  # 파이프라인에서 실패를 감지
+        set -o pipefail  # 파이프라인 실패 감지
         docker buildx bake "${{matrix.service}}" \
           --set "${{matrix.service}}.platform=linux/arm64" \
           --set "${{matrix.service}}.output=type=docker,dest=-" \
@@ -107,6 +107,17 @@ jobs:
         source: "docker-compose.yml,*.tar"
         target: ~/jbok.info/
 
+    - name: Send secrets via ssh
+      uses: appleboy/ssh-action@v1.1.0
+      with:
+        host: ${{secrets.AWS_EC2_HOSTNAME}}
+        username: alpine
+        key: ${{secrets.AWS_EC2_SSH_SECRET_KEY}}
+        script: |
+          mkdir -p ~/jbok.info/.secrets
+          echo "${{secrets.NGINX_CONF}}" > ~/jbok.info/.secrets/nginx.conf
+          echo "${{secrets.RENEW_CONF}}" > ~/jbok.info/.secrets/renew.conf
+          echo "${{secrets.DEFAULT_CONF}}" > ~/jbok.info/.secrets/default.conf
     - name: Run docker compose via ssh
       uses: appleboy/ssh-action@v1.1.0
       with:
@@ -116,9 +127,8 @@ jobs:
         script: |
           cd ~/jbok.info && \
           docker compose down --remove-orphans --rmi all --volumes && \
-          docker image prune -f && \
-          docker container prune -f && \
           for i in *.tar; do docker load -i $i; done && \
+          docker system prune -f --volumes && \
           docker compose up --detach --remove-orphans
 
     - name: Remove Github Actions IP from Security group

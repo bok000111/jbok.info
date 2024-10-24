@@ -7,4 +7,4 @@ RUN mkdir -p /var/www/jbok.info && \
 
 EXPOSE 80 443
 
-ENTRYPOINT ["/bin/sh", "-c", "cp /run/secrets/nginx_conf /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+CMD ["nginx", "-c", "/run/secrets/nginx_conf", "-g", "daemon off;"]

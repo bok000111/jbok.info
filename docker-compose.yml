@@ -61,7 +61,7 @@ volumes:
     name: jbok_info-cert_data
     external: true
   # db_data:
-    # name: jbok_info_db_data
+    # name: jbok_info-db_data
     # external: true
 
 secrets:
