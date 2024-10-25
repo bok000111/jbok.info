@@ -58,7 +58,7 @@ jobs:
       uses: actions/upload-artifact@v4.4.3
       with:
         name: docker-images
-        path: "*.tar.gpg"
+        path: ./*.tar.gpg
         retention-days: 1
         overwrite: true
 
