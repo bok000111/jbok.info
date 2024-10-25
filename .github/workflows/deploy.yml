@@ -1,14 +1,11 @@
 name: Deploy
 
 on:
-  workflow_run:
-    workflows: ["Build"]
-    types:
-      - completed
-
+  push:
+    branches:
+      - main
 jobs:
   deploy:
-    if: ${{github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'}}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,8 +21,11 @@ jobs:
       uses: haythem/public-ip@v1.3
     
     - name: download artifacts
-      uses: actions/download-artifact@v4.1.8
+      uses: dawidd6/action-download-artifact@v6
       with:
+        github_token: ${{secrets.GITHUB_TOKEN}}
+        workflow: build.yml
+        workflow_conclusion: success
         name: docker-images
     
     - name: Create gpg pass file
@@ -35,7 +35,7 @@ jobs:
     
     - name: Decrypt images
       run: |
-        for file in *.tar.gpg; do
+        for file in docker-images/*.tar.gpg; do
           gpg --batch --passphrase-file pass.txt --output "${file/.tar.gpg/.tar}" --decrypt "$file"
         done
 
