@@ -23,10 +23,11 @@ jobs:
     - name: download artifacts
       uses: dawidd6/action-download-artifact@v6
       with:
-        workflow: Build
+        github_token: ${{secrets.GITHUB_TOKEN}}
+        workflow: build.yml
         workflow_conclusion: success
+        name: '.*\\.tar\\.gpg'
         name_is_regexp: true
-        name: '.*\.tar\.gpg'
     
     - name: Create gpg pass file
       run: |
