@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -22,10 +21,12 @@ jobs:
       uses: haythem/public-ip@v1.3
     
     - name: download artifacts
-      uses: actions/download-artifact@v4.1.8
+      uses: dawidd6/action-download-artifact@v6
       with:
-        pattern: '*.tar.gpg'
-        merge-multiple: true
+        workflow: Build
+        workflow_conclusion: success
+        name_is_regexp: true
+        name: '.*\.tar\.gpg'
     
     - name: Create gpg pass file
       run: |
