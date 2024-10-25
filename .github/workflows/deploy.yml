@@ -26,8 +26,7 @@ jobs:
         github_token: ${{secrets.GITHUB_TOKEN}}
         workflow: build.yml
         workflow_conclusion: success
-        name: '.*\.tar\.gpg'
-        name_is_regexp: true
+        name: docker-images
     
     - name: Create gpg pass file
       run: |
@@ -36,7 +35,7 @@ jobs:
     
     - name: Decrypt images
       run: |
-        for file in *.tar.gpg; do
+        for file in docker-images/*.tar.gpg; do
           gpg --batch --passphrase-file pass.txt --output "${file/.tar.gpg/.tar}" --decrypt "$file"
         done
 

@@ -55,3 +55,15 @@ jobs:
     - name: Clean up artifacts and secrets
       if: always()
       run: rm -f '${{matrix.service}}.tar' '${{matrix.service}}.tar.gpg' '${{matrix.service}}.pass.txt'
+
+  merge:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Merge artifacts
+      uses: actions/upload-artifact/merge@v4
+      with:
+        name: docker-images
+        pattern: '*.tar.gpg'
+        delete-merged: true
