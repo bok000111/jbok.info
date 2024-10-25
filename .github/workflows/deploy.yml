@@ -2,65 +2,10 @@ name: Deploy
 
 on:
   push:
-    branches: [ main ]
-
+    branches:
+      - main
 jobs:
-  build:
-    # runs-on: macos-latest # Use macos-latest for native arm64 build
-    runs-on: self-hosted # Use self-hosted runner for arm64 build - M1 Mac
-    environment: jbok.info
-
-    strategy:
-      matrix:
-        service: [axum, frontend, nginx]
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4.2.1
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3.2.0
-      if: runner.arch != 'arm64'
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3.7.1
-
-    # TODO: Compile rust binary and frontend outside of docker for faster build time
-    # - name: Set up rust toolchain
-    #   uses: actions-rs/toolchain@v1
-    #   if: matrix.service == 'axum' || matrix.service == 'frontend'
-    # - name: Compile axum binary
-    #   run: |
-    #     cd backend && \
-    #     cargo build --release --target aarch64-unknown-linux-musl
-    #   if: matrix.service == 'axum'
-    # - name: Compile frontend
-    #   run: |
-    #     cd frontend && \
-    #     yarn install && \
-    #     yarn build
-    #   if: matrix.service == 'frontend'
-
-    - name: Build Docker images
-      run: |
-        set -o pipefail  # 파이프라인 실패 감지
-        docker buildx bake "${{matrix.service}}" \
-          --set "${{matrix.service}}.platform=linux/arm64" \
-          --set "${{matrix.service}}.output=type=docker,dest=-" \
-          --no-cache | \
-          gpg --symmetric --cipher-algo AES256 --batch --passphrase "${{secrets.GPG_PASS}}" \
-          -o "${{matrix.service}}.tar.gpg"
-
-    - name: upload artifacts
-      uses: actions/upload-artifact@v4.4.3
-      with:
-        name: ${{matrix.service}}.tar.gpg
-        path: ${{matrix.service}}.tar.gpg
-        retention-days: 1
-        overwrite: true
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -76,16 +21,22 @@ jobs:
       uses: haythem/public-ip@v1.3
     
     - name: download artifacts
-      uses: actions/download-artifact@v4.1.8
+      uses: dawidd6/action-download-artifact@v6
       with:
-        pattern: '*.tar.gpg'
-        merge-multiple: true
+        github_token: ${{secrets.GITHUB_TOKEN}}
+        workflow: build.yml
+        workflow_conclusion: success
+        name: docker-images
+    
+    - name: Create gpg pass file
+      run: |
+        echo '${{secrets.GPG_PASS}}' > pass.txt
+        chmod 600 pass.txt
     
     - name: Decrypt images
       run: |
         for file in *.tar.gpg; do
-          output_file="${file/.tar.gpg/.tar}"
-          gpg --decrypt --batch --passphrase ${{secrets.GPG_PASS}} -o "$output_file" "$file"
+          gpg --batch --passphrase-file pass.txt --output "${file/.tar.gpg/.tar}" --decrypt "$file"
         done
 
     - name: Configure AWS Credentials
@@ -96,7 +47,14 @@ jobs:
 
     - name: Add Github Actions IP to Security group
       run: |
-        aws ec2 authorize-security-group-ingress --group-id ${{secrets.GH_ACTION_RUNNER_AWS_SG_ID}} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
+        aws ec2 authorize-security-group-ingress --group-id ${{secrets.GH_ACTION_RUNNER_AWS_SG_ID}} --protocol tcp --port 22 --cidr ${{steps.ip.outputs.ipv4}}/32
+
+    - name: Create secret files
+      run: |
+        echo '${{secrets.ENV_PROD}}' > .env
+        echo '${{secrets.NGINX_DEFAULT_CONF}}' > default.conf
+        echo '${{secrets.NGINX_NGINX_CONF}}' > nginx.conf
+        echo '${{secrets.NGINX_RENEW_CONF}}' > renew.conf
 
     - name: SCP images to EC2
       uses: appleboy/scp-action@v0.1.7
@@ -104,20 +62,18 @@ jobs:
         host: ${{secrets.AWS_EC2_HOSTNAME}}
         username: alpine
         key: ${{secrets.AWS_EC2_SSH_SECRET_KEY}}
-        source: "docker-compose.yml,*.tar"
+        source: "docker-compose.yml,.env,*.tar"
         target: ~/jbok.info/
 
-    - name: Send secrets via ssh
-      uses: appleboy/ssh-action@v1.1.0
+    - name: SCP secrets to EC2
+      uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{secrets.AWS_EC2_HOSTNAME}}
         username: alpine
         key: ${{secrets.AWS_EC2_SSH_SECRET_KEY}}
-        script: |
-          mkdir -p ~/jbok.info/.secrets
-          echo "${{secrets.NGINX_CONF}}" > ~/jbok.info/.secrets/nginx.conf
-          echo "${{secrets.RENEW_CONF}}" > ~/jbok.info/.secrets/renew.conf
-          echo "${{secrets.DEFAULT_CONF}}" > ~/jbok.info/.secrets/default.conf
+        source: 'default.conf,nginx.conf,renew.conf'
+        target: ~/secrets/nginx/
+
     - name: Run docker compose via ssh
       uses: appleboy/ssh-action@v1.1.0
       with:
@@ -131,6 +87,11 @@ jobs:
           docker system prune -f --volumes && \
           docker compose up --detach --remove-orphans
 
-    - name: Remove Github Actions IP from Security group
+    - name: Clean up artifacts and secrets
+      if: always()
       run: |
-        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.GH_ACTION_RUNNER_AWS_SG_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
+        rm -rf *.tar .env default.conf nginx.conf renew.conf pass.txt
+      
+    - name: Revoke Github Actions IP from Security group
+      if: always()
+      run: aws ec2 revoke-security-group-ingress --group-id ${{secrets.GH_ACTION_RUNNER_AWS_SG_ID}} --protocol tcp --port 22 --cidr ${{steps.ip.outputs.ipv4}}/32

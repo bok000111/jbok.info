@@ -11,12 +11,14 @@ services:
       - "443:443"
     volumes:
       - static_data:/var/www/jbok.info
-      - cert_data:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
     secrets:
-      - nginx_conf
-      - nginx_default
-      - nginx_renew
+      - nginx.conf
+      - default.conf
+      - renew.conf
+      - ssl_cert
+      - ssl_key
+      - ssl_params
     networks:
       - intra
     depends_on:
@@ -31,9 +33,6 @@ services:
     container_name: axum
     networks:
       - intra
-    # depends_on:
-      # sqlite:
-        # condition: healthy
     restart: unless-stopped
 
   frontend:
@@ -45,32 +44,24 @@ services:
       - static_data:/var/www/jbok.info:rw
     restart: on-failure
 
-  # sqlite:
-  #   image: jbok_info-sqlite:latest
-  #   build:
-  #     context: ./sqlite
-  #   container_name: sqlite
-  #   networks:
-  #     - intra
-  #   restart: unless-stopped
+secrets:
+  # NGINX secrets
+  nginx.conf:
+    file: ${NGINX_CONF_PATH}/nginx.conf
+  default.conf:
+    file: ${NGINX_CONF_PATH}/default.conf
+  renew.conf:
+    file: ${NGINX_CONF_PATH}/renew.conf
+  ssl_cert:
+    file: ${JBOK_INFO_CERT_PATH}/fullchain.pem
+  ssl_key:
+    file: ${JBOK_INFO_CERT_PATH}/privkey.pem
+  ssl_params:
+    file: ${CERT_PARAM_PATH}/ssl-dhparams.pem
 
 volumes:
   static_data:
     name: jbok_info-static_data
-  cert_data:
-    name: jbok_info-cert_data
-    external: true
-  # db_data:
-    # name: jbok_info-db_data
-    # external: true
-
-secrets:
-  nginx_conf:
-    file: .secrets/nginx.conf
-  nginx_default:
-    file: .secrets/default.conf
-  nginx_renew:
-    file: .secrets/renew.conf
 
 networks:
   intra:
