@@ -3,11 +3,10 @@ name: Build
 on:
   pull_request:
     branches:
-      - dev
       - main
   push:
     branches:
-      - main
+      - dev
 
 jobs:
   build:
@@ -45,24 +44,14 @@ jobs:
     - name: Encrypt Artifacts
       run: gpg --batch --symmetric --passphrase-file '${{matrix.service}}.pass.txt' '${{matrix.service}}.tar'
 
-    - name: Clean up artifacts and secrets
-      if: ${{github.base_ref == 'refs/heads/dev'}}
-      run: rm -f '${{matrix.service}}.tar' '${{matrix.service}}.tar.gpg' '${{matrix.service}}.pass.txt'
-
-  upload:
-    needs: build
-    if: ${{github.ref == 'refs/heads/main'}}
-    runs-on: ubuntu-latest
-
-    steps:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4.4.3
       with:
-        name: docker-images
-        path: ./*.tar.gpg
+        name: ${{matrix.service}}.tar.gpg
+        path: ${{matrix.service}}.tar.gpg
         retention-days: 1
         overwrite: true
 
     - name: Clean up artifacts and secrets
       if: always()
-      run: rm -f *.tar.gpg *.tar *.pass.txt
+      run: rm -f '${{matrix.service}}.tar' '${{matrix.service}}.tar.gpg' '${{matrix.service}}.pass.txt'
