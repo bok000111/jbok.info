@@ -44,18 +44,18 @@ jobs:
     - name: Build Docker images
       run: |
         set -o pipefail  # 파이프라인 실패 감지
-        docker buildx bake "${{matrix.service}}" \
-          --set "${{matrix.service}}.platform=linux/arm64" \
-          --set "${{matrix.service}}.output=type=docker,dest=-" \
-          --no-cache > "${{matrix.service}}.tar"
+        docker buildx bake '${{matrix.service}}' \
+          --set '${{matrix.service}}.platform=linux/arm64' \
+          --set '${{matrix.service}}.output=type=docker,dest=-' \
+          --no-cache > '${{matrix.service}}.tar'
     
     - name: Create gpg pass file
       run: |
-        echo "${{secrets.GPG_PASS}}" > "${{matrix.service}}.pass.txt"
-        chmod 600 "${{matrix.service}}.pass.txt"
+        echo '${{secrets.GPG_PASS}}' > '${{matrix.service}}.pass.txt'
+        chmod 600 '${{matrix.service}}.pass.txt'
     
     - name: Encrypt Artifacts
-      run: gpg --batch --symmetric --passphrase-file "${{matrix.service}}.pass.txt" "${{matrix.service}}.tar"
+      run: gpg --batch --symmetric --passphrase-file '${{matrix.service}}.pass.txt' '${{matrix.service}}.tar'
 
     - name: upload artifacts
       uses: actions/upload-artifact@v4.4.3
@@ -67,7 +67,7 @@ jobs:
     
     - name: Clean up artifacts and secrets
       if: always()
-      run: rm -f "${{matrix.service}}.tar" "${{matrix.service}}.tar.gpg" "${{matrix.service}}.pass.txt"
+      run: rm -f '${{matrix.service}}.tar' '${{matrix.service}}.tar.gpg' '${{matrix.service}}.pass.txt'
 
   deploy:
     needs: build
@@ -93,7 +93,7 @@ jobs:
     
     - name: Create gpg pass file
       run: |
-        echo "${{secrets.GPG_PASS}}" > pass.txt
+        echo '${{secrets.GPG_PASS}}' > pass.txt
         chmod 600 pass.txt
     
     - name: Decrypt images
@@ -114,10 +114,10 @@ jobs:
 
     - name: Create secret files
       run: |
-        echo "${{ secrets.ENV_PROD }}" > .env
-        echo "${{ secrets.NGINX_DEFAULT_CONF }}" > default.conf
-        echo "${{ secrets.NGINX_NGINX_CONF }}" > nginx.conf
-        echo "${{ secrets.NGINX_RENEW_CONF }}" > renew.conf
+        echo '${{secrets.ENV_PROD}}' > .env
+        echo '${{secrets.NGINX_DEFAULT_CONF}}' > default.conf
+        echo '${{secrets.NGINX_NGINX_CONF}}' > nginx.conf
+        echo '${{secrets.NGINX_RENEW_CONF}}' > renew.conf
 
     - name: SCP images to EC2
       uses: appleboy/scp-action@v0.1.7
@@ -134,7 +134,7 @@ jobs:
         host: ${{secrets.AWS_EC2_HOSTNAME}}
         username: alpine
         key: ${{secrets.AWS_EC2_SSH_SECRET_KEY}}
-        source: "default.conf,nginx.conf,renew.conf"
+        source: 'default.conf,nginx.conf,renew.conf'
         target: ~/secrets/nginx/
 
     - name: Run docker compose via ssh
